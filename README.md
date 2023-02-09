@@ -1,51 +1,133 @@
-# CakePHP Application Skeleton
+# CakePHP Queue Plugin
+A queue in CakePHP is a method for arranging a task's processing, frequently for performance reasons. A job is added to a queue rather than being executed right away, and the queue is completed by a different worker process. By enabling task execution in the background, resources may be made available for the main process, which enhances the performance of the programme.
 
-[![Build Status](https://img.shields.io/travis/cakephp/app/master.svg?style=flat-square)](https://travis-ci.org/cakephp/app)
-[![Total Downloads](https://img.shields.io/packagist/dt/cakephp/app.svg?style=flat-square)](https://packagist.org/packages/cakephp/app)
+CakePHP offers a queue implementation through the CakePHP/Queue package. This package offers a straightforward, dependable, and effective method for managing and carrying out background tasks in CakePHP applications. Worker processes can execute jobs that have been added to the queue locally or on a remote server. This can be beneficial for activities that take a while and slow down the main programme, such as sending emails, processing photos, or creating reports.
 
-A skeleton for creating applications with [CakePHP](https://cakephp.org) 3.x.
+## Setup
+- Update your Composer
 
-The framework source code can be found here: [cakephp/cakephp](https://github.com/cakephp/cakephp).
+    ```composer update```
+  
+  
+- Installation
+  
+  ``` composer require dereuromark/cakephp-queue ```
 
-## Installation
+  Load the plugin in bootstrapCli function in src/Application
 
-1. Download [Composer](https://getcomposer.org/doc/00-intro.md) or update `composer self-update`.
-2. Run `php composer.phar create-project --prefer-dist cakephp/app [app_name]`.
+  ```
+  protected function bootstrapCli()
+    {
+        
+        // Existing Code
 
-If Composer is installed globally, run
+        $this->addPlugin('Queue');
+    }
+    ```
 
-```bash
-composer create-project --prefer-dist "cakephp/app:^3.8"
-```
+- Database migration
+ 
+    Run the following command in the CakePHP console.
 
-In case you want to use a custom app dir name (e.g. `/myapp/`):
-
-```bash
-composer create-project --prefer-dist "cakephp/app:^3.8" myapp
-```
-
-You can now either use your machine's webserver to view the default home page, or start
-up the built-in webserver with:
-
-```bash
-bin/cake server -p 8765
-```
-
-Then visit `http://localhost:8765` to see the welcome page.
-
-## Update
-
-Since this skeleton is a starting point for your application and various files
-would have been modified as per your needs, there isn't a way to provide
-automated upgrades, so you have to do any updates manually.
+  ```bin/cake migrations migrate -p Queue```
 
 ## Configuration
+  Create a file called ```app_queue.php``` inside your config folder to set some values.
 
-Read and edit `config/app.php` and setup the `'Datasources'` and any other
-configuration relevant for your application.
+  Example:
+  ```
+    return [
+        'Queue' => [
+            'workermaxruntime' => 60,
+            'sleeptime' => 15,
+        ],
+    ];
+```
 
-## Layout
+## Queueing Jobs
+Run the following command in the CakePHP console.
 
-The app skeleton uses a subset of [Foundation](http://foundation.zurb.com/) (v5) CSS
-framework by default. You can, however, replace it with any other library or
-custom styles.
+- Display simple job queue (or deferred-task) system. It contains available tasks and the subcommands to execute.
+  
+    ``` bin/cake queue```
+
+- Try to call the cli add subcommand on a task.
+
+  ```bin/cake queue add <TaskName>```
+
+- Run a queue worker to execute the pending task.
+
+    ```  bin/cake queue run```
+    
+## Creating a new Task
+You can build your own task and put it in ```/src/Shell/Task/``` as Queue{TaskName}Task.php.
+
+You can set two main things on each task as property: timeout and retries.
+```
+class QueueAbcTask extends QueueTask implements AddInterface 
+
+{
+
+
+      /**
+     * @var int
+     */
+    public $timeout = 20;
+
+    /**
+     * @var int
+     */
+    public $retries = 1;
+```
+
+### Logging Task
+
+This is the example task of logging an Alphabet character :
+
+```
+
+
+    public function add(){
+        $this->out('CakePHP Queue Example task.');
+		$this->hr();
+		$this->out('This is a Abc QueueTask.');
+		$this->out('I will now add an example Job into the Queue.');
+		$this->out('This job will only produce some console output on the worker that it runs on.');
+		$this->out(' ');
+		$this->out('To run a Worker use:');
+		$this->out('    bin/cake queue runworker');
+		$this->out(' ');
+		$this->out('You can find the sourcecode of this task in: ');
+		$this->out(__FILE__);
+		$this->out(' ');
+
+		$this->QueuedJobs->createJob('Abc');
+		$this->success('OK, job created, now run the worker');
+    }
+    /**
+     * @param array $data The array passed to QueuedJobsTable::createJob()
+     * @param int $jobId The id of the QueuedJob entity
+     * @return void
+     */
+    public function run(array $data, $jobId) {
+        if (!$this->doLog()) {
+            throw new Exception('Couldnt do sth.');
+        }
+    }
+
+    public function doLog()
+    {
+        $this->out('Log task started...');
+        Log::write('debug', 'Log task started...');
+
+        Log::write('debug', 'A');
+
+        $this->out('Log task completed.');
+        Log::write('debug', 'Log task completed.');
+
+        return true;
+    }
+
+}
+```
+You can view the output in ```logs/cli-debug``` file.
